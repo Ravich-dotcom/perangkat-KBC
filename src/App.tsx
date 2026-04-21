@@ -4,13 +4,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { saveAs } from 'file-saver';
-import { Download, Loader2, Play, Settings2, FileText, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Download, Loader2, Play, Settings2, FileText, AlertTriangle, CheckCircle2, Key, Eye, EyeOff } from 'lucide-react';
 import { cn } from './lib/utils';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// We will initialize this dynamically in the generation function to support custom user API keys
 
 const MATA_PELAJARAN = [
   "Al-Qur'an Hadis", "Akidah Akhlak", "Fikih", "Sejarah Kebudayaan Islam", "Bahasa Arab",
@@ -56,6 +56,13 @@ export default function App() {
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [retryTimer, setRetryTimer] = useState(0);
+  const [userApiKey, setUserApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+  const [showKey, setShowKey] = useState(false);
+
+  // Persist API Key
+  useEffect(() => {
+    localStorage.setItem('gemini_api_key', userApiKey);
+  }, [userApiKey]);
 
   // Timer logic for API rate limits
   useEffect(() => {
@@ -76,8 +83,10 @@ export default function App() {
   };
 
   const generateDocument = async () => {
-    if (!process.env.GEMINI_API_KEY) {
-      setError('GEMINI_API_KEY tidak ditemukan. Silakan atur di pengaturan AI Studio.');
+    const finalApiKey = userApiKey || process.env.GEMINI_API_KEY;
+
+    if (!finalApiKey) {
+      setError('Gemini API Key tidak ditemukan. Silakan masukkan API Key Anda di bagian "API Key & Koneksi" agar kuota tidak terbatas pada satu akun.');
       return;
     }
 
@@ -178,6 +187,7 @@ Tabel berikut harus dirender dengan border='0' atau borderless saat di-copy ke W
 `;
 
     try {
+      const ai = new GoogleGenAI({ apiKey: finalApiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: prompt,
@@ -276,6 +286,41 @@ Tabel berikut harus dirender dengan border='0' atau borderless saat di-copy ke W
           
           <div className="p-5 overflow-y-auto flex-1 space-y-5 scrollbar-thin">
             
+            {/* API Key Configuration - Added for multi-user / quota management */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded">API Key & Koneksi</h3>
+                {!userApiKey && !process.env.GEMINI_API_KEY && (
+                   <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                )}
+              </div>
+              <div className="space-y-1 relative">
+                <label className="text-[11px] font-semibold text-slate-500 uppercase flex items-center gap-1">
+                  <Key className="w-3 h-3" /> Gemini API Key
+                </label>
+                <div className="relative group">
+                  <input 
+                    type={showKey ? "text" : "password"} 
+                    value={userApiKey} 
+                    onChange={(e) => setUserApiKey(e.target.value)} 
+                    placeholder="AI Studio API Key (Opsional)" 
+                    className="w-full bg-slate-50 border border-slate-200 text-xs rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-emerald-600 transition-colors"
+                  >
+                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Masukkan API Key Anda jika kuota sistem utama habis. Key disimpan aman di browser Anda. 
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-1 text-emerald-600 hover:underline">Dapatkan Key Gratis</a>
+                </p>
+              </div>
+            </div>
+
             {/* Identity Group */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded">Identitas Dasar</h3>
